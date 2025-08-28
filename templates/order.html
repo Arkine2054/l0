@@ -1,0 +1,238 @@
+<!doctype html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8" />
+    <title>Поиск заказа</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <style>
+        :root { --bg:#0b1020; --fg:#e8ecf1; --muted:#9aa4b2; --card:#11182b; --accent:#3b82f6; --ok:#22c55e; --err:#ef4444; --border:#1e293b; }
+        * { box-sizing: border-box; }
+        body { margin:0; font-family: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; background:var(--bg); color:var(--fg); }
+        .wrap { max-width: 980px; margin: 40px auto; padding: 0 16px; }
+        .card { background: var(--card); border: 1px solid var(--border); border-radius: 16px; padding: 20px; box-shadow: 0 10px 30px rgba(0,0,0,.25); }
+        h1 { margin:0 0 14px; font-size: 22px; }
+        .row { display:flex; gap: 10px; flex-wrap: wrap; }
+        input[type="text"] { flex:1; min-width: 220px; padding: 12px 14px; border-radius: 12px; border:1px solid var(--border); background:#0f1629; color:var(--fg); }
+        button { padding: 12px 16px; border-radius: 12px; border:1px solid transparent; background: var(--accent); color:white; cursor:pointer; }
+        button:disabled { opacity:.6; cursor:not-allowed; }
+        .help { color: var(--muted); font-size: 13px; margin-top: 8px; }
+        .status { margin-top: 14px; font-size: 14px; }
+        .status.ok { color: var(--ok); }
+        .status.err { color: var(--err); }
+        .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-top: 18px; }
+        .kv { border:1px solid var(--border); border-radius: 12px; padding: 14px; }
+        .kv h3 { margin:0 0 10px; font-size: 16px; color:#d2d8e3; }
+        .kv dl { display:grid; grid-template-columns: 180px 1fr; gap: 8px 12px; margin:0; }
+        .kv dt { color: var(--muted); }
+        .kv dd { margin:0; }
+        table { width:100%; border-collapse: collapse; margin-top: 14px; }
+        th, td { border-bottom:1px solid var(--border); padding:10px; text-align:left; vertical-align: top; }
+        th { color:#c9d2df; font-weight:600; }
+        pre { margin:0; border:1px solid var(--border); background:#0a1122; border-radius:12px; padding:14px; overflow:auto; }
+        .json { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
+        .section { margin-top: 20px; }
+        .pill { display:inline-block; padding:2px 8px; border-radius: 999px; background:#0f1a33; border:1px solid var(--border); color:#c8d4e1; font-size: 12px; }
+        @media (max-width: 860px) { .grid { grid-template-columns: 1fr; } }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="card">
+        <h1>Поиск заказа по ID</h1>
+        <div class="row">
+            <input id="orderId" type="text" placeholder="Например: order-123" />
+            <button id="btn">Найти</button>
+        </div>
+        <div class="help">Страница обращается к JSON API сервиса и показывает данные заказа.</div>
+        <div id="status" class="status" aria-live="polite"></div>
+
+        <div id="content" style="display:none;">
+            <div class="grid">
+                <div class="kv">
+                    <h3>Общее</h3>
+                    <dl>
+                        <dt>Order UID</dt><dd id="f-order"></dd>
+                        <dt>Track number</dt><dd id="f-track"></dd>
+                        <dt>Locale</dt><dd id="f-locale"></dd>
+                        <dt>Customer ID</dt><dd id="f-customer"></dd>
+                        <dt>Delivery service</dt><dd id="f-dservice"></dd>
+                        <dt>Shard key</dt><dd id="f-shard"></dd>
+                        <dt>SM ID</dt><dd id="f-smid"></dd>
+                        <dt>Date created</dt><dd id="f-date"></dd>
+                        <dt>OOF shard</dt><dd id="f-oof"></dd>
+                    </dl>
+                </div>
+                <div class="kv">
+                    <h3>Доставка</h3>
+                    <dl>
+                        <dt>ФИО</dt><dd id="d-name"></dd>
+                        <dt>Телефон</dt><dd id="d-phone"></dd>
+                        <dt>Индекс</dt><dd id="d-zip"></dd>
+                        <dt>Город</dt><dd id="d-city"></dd>
+                        <dt>Адрес</dt><dd id="d-addr"></dd>
+                        <dt>Регион</dt><dd id="d-region"></dd>
+                        <dt>Email</dt><dd id="d-email"></dd>
+                    </dl>
+                </div>
+            </div>
+
+            <div class="grid section">
+                <div class="kv">
+                    <h3>Оплата</h3>
+                    <dl>
+                        <dt>Транзакция</dt><dd id="p-tx"></dd>
+                        <dt>Провайдер</dt><dd id="p-prov"></dd>
+                        <dt>Валюта</dt><dd id="p-cur"></dd>
+                        <dt>Сумма</dt><dd id="p-amount"></dd>
+                        <dt>Время оплаты (unix)</dt><dd id="p-dt"></dd>
+                        <dt>Банк</dt><dd id="p-bank"></dd>
+                        <dt>Доставка</dt><dd id="p-dcost"></dd>
+                        <dt>Товары всего</dt><dd id="p-gtotal"></dd>
+                        <dt>Custom fee</dt><dd id="p-fee"></dd>
+                    </dl>
+                </div>
+                <div class="kv">
+                    <h3>Товары <span id="items-count" class="pill">0</span></h3>
+                    <div style="overflow:auto">
+                        <table id="items">
+                            <thead>
+                            <tr>
+                                <th>#</th>
+                                <th>Название</th>
+                                <th>Бренд</th>
+                                <th>Цена</th>
+                                <th>Скидка</th>
+                                <th>Размер</th>
+                                <th>Итог</th>
+                                <th>RID</th>
+                                <th>CHRT ID</th>
+                                <th>NM ID</th>
+                                <th>Статус</th>
+                            </tr>
+                            </thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <div class="section">
+                <h3 style="margin:0 0 10px;">JSON</h3>
+                <pre class="json" id="json"></pre>
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+    const API_PATTERN = (id) => `/order${encodeURIComponent(id)}`;
+
+    const $ = (id) => document.getElementById(id);
+    const btn = $('btn');
+    const input = $('orderId');
+    const statusEl = $('status');
+    const content = $('content');
+
+    function setStatus(text, type) {
+        statusEl.textContent = text || '';
+        statusEl.className = 'status ' + (type || '');
+    }
+
+    function fmt(v) {
+        return v === undefined || v === null || v === '' ? '—' : String(v);
+    }
+
+    function fillKV(order) {
+        $('f-order').textContent   = fmt(order.order_uid || order.OrderUID);
+        $('f-track').textContent   = fmt(order.track_number || order.TrackNumber);
+        $('f-locale').textContent  = fmt(order.locale || order.Locale);
+        $('f-customer').textContent= fmt(order.customer_id || order.CustomerID);
+        $('f-dservice').textContent= fmt(order.delivery_service || order.DeliveryService);
+        $('f-shard').textContent   = fmt(order.shardkey || order.shardKey || order.ShardKey);
+        $('f-smid').textContent    = fmt(order.sm_id || order.SmID);
+        $('f-date').textContent    = fmt(order.date_created || order.DateCreated);
+        $('f-oof').textContent     = fmt(order.oof_shard || order.OofShard);
+
+        const d = order.delivery || order.Delivery || {};
+        $('d-name').textContent   = fmt(d.name || d.Name);
+        $('d-phone').textContent  = fmt(d.phone || d.Phone);
+        $('d-zip').textContent    = fmt(d.zip || d.Zip);
+        $('d-city').textContent   = fmt(d.city || d.City);
+        $('d-addr').textContent   = fmt(d.address || d.Address);
+        $('d-region').textContent = fmt(d.region || d.Region);
+        $('d-email').textContent  = fmt(d.email || d.Email);
+
+        const p = order.payment || order.Payment || {};
+        $('p-tx').textContent     = fmt(p.transaction || p.Transaction);
+        $('p-prov').textContent   = fmt(p.provider || p.Provider);
+        $('p-cur').textContent    = fmt(p.currency || p.Currency);
+        $('p-amount').textContent = fmt(p.amount || p.Amount);
+        $('p-dt').textContent     = fmt(p.payment_dt || p.PaymentDT);
+        $('p-bank').textContent   = fmt(p.bank || p.Bank);
+        $('p-dcost').textContent  = fmt(p.delivery_cost || p.DeliveryCost);
+        $('p-gtotal').textContent = fmt(p.goods_total || p.GoodsTotal);
+        $('p-fee').textContent    = fmt(p.custom_fee || p.CustomFee);
+
+        // Items
+        const items = order.items || order.Items || [];
+        $('items-count').textContent = items.length;
+        const tbody = $('items').querySelector('tbody');
+        tbody.innerHTML = '';
+        items.forEach((it, i) => {
+            const tr = document.createElement('tr');
+            tr.innerHTML = `
+          <td>${i+1}</td>
+          <td>${fmt(it.name || it.Name)}</td>
+          <td>${fmt(it.brand || it.Brand)}</td>
+          <td>${fmt(it.price || it.Price)}</td>
+          <td>${fmt(it.sale || it.Sale)}</td>
+          <td>${fmt(it.size || it.Size)}</td>
+          <td>${fmt(it.total_price || it.TotalPrice)}</td>
+          <td>${fmt(it.rid || it.RID)}</td>
+          <td>${fmt(it.chrt_id || it.ChrtID)}</td>
+          <td>${fmt(it.nm_id || it.NmID)}</td>
+          <td>${fmt(it.status || it.Status)}</td>
+        `;
+            tbody.appendChild(tr);
+        });
+    }
+
+    async function loadOrder(id) {
+        if (!id) {
+            setStatus('Введите ID заказа.', 'err');
+            content.style.display = 'none';
+            return;
+        }
+        setStatus('Загрузка...', '');
+        content.style.display = 'none';
+        btn.disabled = true;
+
+        try {
+            const res = await fetch(API_PATTERN(id), { headers: { 'Accept': 'application/json' }});
+            if (!res.ok) {
+                if (res.status === 404) {
+                    setStatus('Заказ не найден.', 'err');
+                } else {
+                    setStatus(`Ошибка запроса: ${res.status}`, 'err');
+                }
+                return;
+            }
+            const data = await res.json();
+
+            $('json').textContent = JSON.stringify(data, null, 2);
+            fillKV(data);
+
+            content.style.display = '';
+            setStatus('Готово.', 'ok');
+        } catch (e) {
+            setStatus('Сетевая ошибка: ' + e.message, 'err');
+        } finally {
+            btn.disabled = false;
+        }
+    }
+
+    btn.addEventListener('click', () => loadOrder(input.value.trim()));
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter') loadOrder(input.value.trim()); });
+</script>
+</body>
+</html>
