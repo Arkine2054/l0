@@ -7,7 +7,6 @@ import (
 	"github.com/Arkine2054/l0/internal/models"
 	"github.com/lib/pq"
 	"log"
-	"os"
 	"sync"
 )
 
@@ -202,8 +201,7 @@ func (r *repo) GetByID(ctx context.Context, id string) (*models.Order, error) {
 	r.mu.RUnlock()
 
 	if ok {
-		fmt.Fprintf(os.Stdout, "data loaded from cache: %v\n", id)
-
+		log.Printf("data loaded from cache: %v", id)
 		return cached, nil
 	}
 
