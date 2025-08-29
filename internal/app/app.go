@@ -33,7 +33,6 @@ func Run() error {
 		return fmt.Errorf("KAFKA_BROKERS и KAFKA_TOPIC обязательны")
 	}
 
-	// проверка Kafka соединения
 	if err := util.TestConnection(kafkaBrokers); err != nil {
 		return err
 	}
@@ -47,7 +46,6 @@ func Run() error {
 		return fmt.Errorf("DB connect error: %w", err)
 	}
 
-	// Repo + Cache
 	repository := repo.NewRepo(db)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
@@ -59,7 +57,6 @@ func Run() error {
 
 	l := logic.NewLogic(repository)
 
-	// Kafka producer для DLQ
 	dlqProducer, err := kafka.NewProducer(kafkaBrokers, "orders_dlq")
 	if err != nil {
 		log.Fatalf("DLQ producer error: %v", err)
@@ -70,7 +67,6 @@ func Run() error {
 		log.Fatalf("consumer error: %v", err)
 	}
 
-	// Consumer слушает Kafka в фоне
 	go func() {
 		if err := consumer.Listen(context.Background(), func(order *models.Order) error {
 			if err := l.CreateOrder(context.Background(), order); err != nil {
@@ -90,7 +86,6 @@ func Run() error {
 	router.GET("/", c.Index)
 	router.GET("/order/:id", c.GetOrder)
 
-	// HTTP сервер с graceful shutdown
 	srv := &http.Server{
 		Addr:    ":8080",
 		Handler: router,
@@ -109,7 +104,6 @@ func Run() error {
 
 	log.Println("HTTP сервер запущен на :8080")
 
-	// блокируем Run, пока сервер работает
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server error: %w", err)
 	}

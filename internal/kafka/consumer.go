@@ -10,7 +10,6 @@ import (
 	"time"
 )
 
-// Consumer отвечает за чтение сообщений из Kafka
 type Consumer struct {
 	consumer    *kafka.Consumer
 	topic       string
@@ -28,8 +27,8 @@ func NewConsumer(brokers, topic, group string, dlqProducer *Producer) (*Consumer
 		c, err = kafka.NewConsumer(&kafka.ConfigMap{
 			"bootstrap.servers":  brokers,
 			"group.id":           group,
-			"auto.offset.reset":  "earliest", // читаем из начала, если новый consumer group
-			"enable.auto.commit": false,      // сами управляем коммитами
+			"auto.offset.reset":  "earliest",
+			"enable.auto.commit": false,
 		})
 		if err == nil {
 			break
@@ -78,7 +77,6 @@ func (c *Consumer) Listen(ctx context.Context, handler func(order *models.Order)
 						}
 					}
 
-					// коммитим offset, чтобы не застревать на битом сообщении
 					_, _ = c.consumer.CommitMessage(e)
 					continue
 				}
@@ -88,7 +86,6 @@ func (c *Consumer) Listen(ctx context.Context, handler func(order *models.Order)
 					continue
 				}
 
-				// успех → коммитим offset
 				_, err = c.consumer.CommitMessage(e)
 				if err != nil {
 					log.Printf("[ERROR] Commit offset error: %v", err)

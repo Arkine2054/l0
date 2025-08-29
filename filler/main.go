@@ -87,14 +87,12 @@ func main() {
 			},
 		}
 
-		// Сериализуем заказ в JSON
 		data, err := json.Marshal(order)
 		if err != nil {
 			log.Println("Error marshal test order:", err)
 			continue
 		}
 
-		// Отправляем заказ в Kafka
 		err = producer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
 			Value:          data,
@@ -109,7 +107,6 @@ func main() {
 		time.Sleep(1 * time.Second)
 	}
 
-	// Дожидаемся отправки всех сообщений
 	producer.Flush(15 * 1000)
 	fmt.Println("Filler finished.")
 }
