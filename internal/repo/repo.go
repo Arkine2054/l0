@@ -7,7 +7,9 @@ import (
 	"github.com/Arkine2054/l0/internal/models"
 	"github.com/lib/pq"
 	"log"
+	"os"
 	"sync"
+	"time"
 )
 
 type repo struct {
@@ -97,13 +99,11 @@ func (r *repo) CreateOrder(ctx context.Context, order *models.Order) error {
 	return nil
 }
 func (r *repo) WarmUpCache(ctx context.Context) error {
-	cache := make(map[string]*models.Order)
-
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT order_uid, track_number, entry, locale, customer_id,
 		       delivery_service, shardkey, sm_id, date_created, oof_shard
 		FROM orders
-		ORDER BY date_created DESC
+		ORDER BY date_created DESC 
 		LIMIT 100`)
 	if err != nil {
 		return fmt.Errorf("load orders error: %w", err)
@@ -119,7 +119,7 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 		); err != nil {
 			return fmt.Errorf("scan order error: %w", err)
 		}
-		cache[o.OrderUID] = o
+		r.cache[o.OrderUID] = o
 		orderIDs = append(orderIDs, o.OrderUID)
 	}
 
@@ -141,7 +141,7 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 		if err := delRows.Scan(&oid, &d.Name, &d.Phone, &d.Zip, &d.City, &d.Address, &d.Region, &d.Email); err != nil {
 			return fmt.Errorf("scan delivery error: %w", err)
 		}
-		if o, ok := cache[oid]; ok {
+		if o, ok := r.cache[oid]; ok {
 			o.Delivery = d
 		}
 	}
@@ -162,7 +162,7 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 			&p.Amount, &p.PaymentDT, &p.Bank, &p.DeliveryCost, &p.GoodsTotal, &p.CustomFee); err != nil {
 			return fmt.Errorf("scan payment error: %w", err)
 		}
-		if o, ok := cache[oid]; ok {
+		if o, ok := r.cache[oid]; ok {
 			o.Payment = p
 		}
 	}
@@ -184,12 +184,12 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 			&it.Brand, &it.Status); err != nil {
 			return fmt.Errorf("scan item error: %w", err)
 		}
-		if o, ok := cache[oid]; ok {
+		if o, ok := r.cache[oid]; ok {
 			o.Items = append(o.Items, it)
 		}
 	}
 
-	log.Printf("WarmUpCache: loaded %d orders into cache", len(cache))
+	log.Printf("WarmUpCache: loaded %d orders into cache", len(r.cache))
 	return nil
 }
 
@@ -201,7 +201,7 @@ func (r *repo) GetByID(ctx context.Context, id string) (*models.Order, error) {
 	r.mu.RUnlock()
 
 	if ok {
-		log.Printf("data loaded from cache: %v", id)
+		fmt.Fprintf(os.Stdout, "%v data loaded from cache: %v\n", time.DateTime, id)
 		return cached, nil
 	}
 
