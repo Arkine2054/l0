@@ -4,16 +4,18 @@ services:
   db:
     image: postgres:15
     restart: always
+    env_file:
+      - .env
     environment:
-      - POSTGRES_USER=user
-      - POSTGRES_PASSWORD=password123
-      - POSTGRES_DB=testdb
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASSWORD}
+      POSTGRES_DB: ${DB_NAME}
     ports:
-      - "5555:5432"
+      - "5432:${DB_PORT}"
     volumes:
       - db_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U user -d testdb"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER} -d ${DB_NAME}"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -29,38 +31,36 @@ services:
     entrypoint: [
       "migrate",
       "-path", "/migrations",
-      "-database", "postgres://user:password123@db:5432/testdb?sslmode=disable"
+      "-database", "postgres://${DB_USER}:${DB_PASSWORD}@db:5432/${DB_NAME}?sslmode=${DB_SSLMODE}",
+      "up"
     ]
 
   app:
     build: .
+    env_file:
+      - .env
     depends_on:
       db:
         condition: service_healthy
       kafka:
         condition: service_healthy
     ports:
-      - "8080:8080"
+      - "${HTTP_PORT}:${HTTP_PORT}"
     environment:
-      - DB_HOST=db
-      - DB_PORT=5432
-      - DB_USER=user
-      - DB_PASSWORD=password123
-      - DB_NAME=testdb
-      - KAFKA_BROKERS=kafka:29092
-      - KAFKA_TOPIC=orders
+      KAFKA_BROKERS: kafka:29092
     restart: on-failure
 
   filler:
     build:
       context: .
       dockerfile: ./filler/Dockerfile
+    env_file:
+      - .env
     depends_on:
       kafka:
         condition: service_healthy
     environment:
-      - KAFKA_BROKERS=kafka:29092
-      - KAFKA_TOPIC=orders
+      KAFKA_BROKERS: kafka:29092
     restart: "no"
 
   zookeeper:

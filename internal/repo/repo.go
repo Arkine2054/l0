@@ -1,20 +1,38 @@
 package repo
 
+//go:generate mockgen -destination repo_mock.go -source repo.go -package repo
+
 import (
 	"context"
 	"database/sql"
 	"fmt"
-	"github.com/Arkine2054/l0/internal/models"
-	"github.com/lib/pq"
 	"log"
 	"os"
 	"sync"
-	"time"
+
+	"github.com/Arkine2054/l0/internal/models"
+	"github.com/hashicorp/golang-lru/v2"
+	"github.com/lib/pq"
 )
+
+// Cache abstracts a simple key-value cache for orders.
+// It allows the repository to be tested without binding to a specific cache implementation.
+type Cache interface {
+	Get(key string) (*models.Order, bool)
+	Add(key string, value *models.Order)
+}
+
+// lruCacheAdapter adapts hashicorp/golang-lru Cache to the local Cache interface.
+type lruCacheAdapter struct {
+	c *lru.Cache[string, *models.Order]
+}
+
+func (a *lruCacheAdapter) Get(key string) (*models.Order, bool) { return a.c.Get(key) }
+func (a *lruCacheAdapter) Add(key string, value *models.Order)  { a.c.Add(key, value) }
 
 type repo struct {
 	db    *sql.DB
-	cache map[string]*models.Order
+	cache Cache
 	mu    sync.RWMutex
 }
 
@@ -25,11 +43,22 @@ type Repo interface {
 	Close(ctx context.Context) error
 }
 
-func NewRepo(db *sql.DB) Repo {
+func NewRepo(db *sql.DB, cacheSize int) Repo {
+	LruCache, err := lru.New[string, *models.Order](cacheSize)
+	if err != nil {
+		panic(fmt.Sprintf("cannot create LRU cache: %v", err))
+	}
+	log.Printf("LRU cache initialized with size %d", cacheSize)
+
 	return &repo{
 		db:    db,
-		cache: make(map[string]*models.Order),
+		cache: &lruCacheAdapter{c: LruCache},
 	}
+}
+
+// NewRepoWithCache allows injecting a custom cache implementation (useful for tests).
+func NewRepoWithCache(db *sql.DB, cache Cache) Repo {
+	return &repo{db: db, cache: cache}
 }
 
 func (r *repo) CreateOrder(ctx context.Context, order *models.Order) error {
@@ -91,13 +120,78 @@ func (r *repo) CreateOrder(ctx context.Context, order *models.Order) error {
 		return fmt.Errorf("commit tx error: %w", err)
 	}
 
-	// обновляем кэш
 	r.mu.Lock()
-	r.cache[order.OrderUID] = order
+	r.cache.Add(order.OrderUID, order)
 	r.mu.Unlock()
 
 	return nil
 }
+
+func (r *repo) GetByID(ctx context.Context, id string) (*models.Order, error) {
+	r.mu.RLock()
+	if cached, ok := r.cache.Get(id); ok {
+		r.mu.RUnlock()
+		log.Printf("data loaded from cache: %v", id)
+		return cached, nil
+	}
+	r.mu.RUnlock()
+
+	log.Printf("data loaded from database: %v", id)
+
+	var order models.Order
+	err := r.db.QueryRowContext(ctx, `
+		SELECT order_uid, track_number, entry, locale, customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard
+		FROM orders WHERE order_uid=$1`, id).
+		Scan(&order.OrderUID, &order.TrackNumber, &order.Entry, &order.Locale,
+			&order.CustomerID, &order.DeliveryService, &order.ShardKey,
+			&order.SmID, &order.DateCreated, &order.OofShard)
+	if err != nil {
+		return nil, fmt.Errorf("error getting order by id: %w", err)
+	}
+
+	err = r.db.QueryRowContext(ctx, `
+		SELECT name, phone, zip, city, address, region, email 
+		FROM deliveries WHERE order_uid=$1`, id).
+		Scan(&order.Delivery.Name, &order.Delivery.Phone, &order.Delivery.Zip,
+			&order.Delivery.City, &order.Delivery.Address, &order.Delivery.Region, &order.Delivery.Email)
+	if err != nil {
+		return nil, fmt.Errorf("error getting deliveries by id: %w", err)
+	}
+
+	err = r.db.QueryRowContext(ctx, `
+		SELECT transaction, currency, provider, amount, payment_dt, bank, delivery_cost, goods_total, custom_fee
+		FROM payments WHERE order_uid=$1`, id).
+		Scan(&order.Payment.Transaction, &order.Payment.Currency, &order.Payment.Provider,
+			&order.Payment.Amount, &order.Payment.PaymentDT, &order.Payment.Bank,
+			&order.Payment.DeliveryCost, &order.Payment.GoodsTotal, &order.Payment.CustomFee)
+	if err != nil {
+		return nil, fmt.Errorf("error getting payments by id: %w", err)
+	}
+
+	rows, err := r.db.QueryContext(ctx, `
+		SELECT chrt_id, track_number, price, rid, name, sale, size, total_price, nm_id, brand, status
+		FROM items WHERE order_uid=$1`, id)
+	if err != nil {
+		return nil, fmt.Errorf("error getting items by id: %w", err)
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var it models.Item
+		if err := rows.Scan(&it.ChrtID, &it.TrackNumber, &it.Price, &it.RID,
+			&it.Name, &it.Sale, &it.Size, &it.TotalPrice, &it.NmID, &it.Brand, &it.Status); err != nil {
+			log.Println(err)
+		}
+		order.Items = append(order.Items, it)
+	}
+
+	r.mu.Lock()
+	r.cache.Add(id, &order)
+	r.mu.Unlock()
+
+	return &order, nil
+}
+
 func (r *repo) WarmUpCache(ctx context.Context) error {
 	rows, err := r.db.QueryContext(ctx, `
 		SELECT order_uid, track_number, entry, locale, customer_id,
@@ -106,7 +200,7 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 		ORDER BY date_created DESC 
 		LIMIT 100`)
 	if err != nil {
-		return fmt.Errorf("load orders error: %w", err)
+		return fmt.Errorf("load orders query error: %w", err)
 	}
 	defer rows.Close()
 
@@ -119,11 +213,16 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 		); err != nil {
 			return fmt.Errorf("scan order error: %w", err)
 		}
-		r.cache[o.OrderUID] = o
+
+		r.cache.Add(o.OrderUID, o)
 		orderIDs = append(orderIDs, o.OrderUID)
+	}
+	if err := rows.Err(); err != nil {
+		return fmt.Errorf("orders rows error: %w", err)
 	}
 
 	if len(orderIDs) == 0 {
+		log.Println("WarmUpCache: no orders found in database")
 		return nil
 	}
 
@@ -132,7 +231,7 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 		FROM deliveries
 		WHERE order_uid = ANY($1)`, pq.Array(orderIDs))
 	if err != nil {
-		return fmt.Errorf("load deliveries error: %w", err)
+		return fmt.Errorf("load deliveries query error: %w", err)
 	}
 	defer delRows.Close()
 	for delRows.Next() {
@@ -141,9 +240,12 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 		if err := delRows.Scan(&oid, &d.Name, &d.Phone, &d.Zip, &d.City, &d.Address, &d.Region, &d.Email); err != nil {
 			return fmt.Errorf("scan delivery error: %w", err)
 		}
-		if o, ok := r.cache[oid]; ok {
-			o.Delivery = d
+		if v, ok := r.cache.Get(oid); ok {
+			v.Delivery = d
 		}
+	}
+	if err := delRows.Err(); err != nil {
+		return fmt.Errorf("deliveries rows error: %w", err)
 	}
 
 	payRows, err := r.db.QueryContext(ctx, `
@@ -152,7 +254,7 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 		FROM payments
 		WHERE order_uid = ANY($1)`, pq.Array(orderIDs))
 	if err != nil {
-		return fmt.Errorf("load payments error: %w", err)
+		return fmt.Errorf("load payments query error: %w", err)
 	}
 	defer payRows.Close()
 	for payRows.Next() {
@@ -162,9 +264,12 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 			&p.Amount, &p.PaymentDT, &p.Bank, &p.DeliveryCost, &p.GoodsTotal, &p.CustomFee); err != nil {
 			return fmt.Errorf("scan payment error: %w", err)
 		}
-		if o, ok := r.cache[oid]; ok {
-			o.Payment = p
+		if v, ok := r.cache.Get(oid); ok {
+			v.Payment = p
 		}
+	}
+	if err := payRows.Err(); err != nil {
+		return fmt.Errorf("payments rows error: %w", err)
 	}
 
 	itemRows, err := r.db.QueryContext(ctx, `
@@ -173,7 +278,7 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 		FROM items
 		WHERE order_uid = ANY($1)`, pq.Array(orderIDs))
 	if err != nil {
-		return fmt.Errorf("load items error: %w", err)
+		return fmt.Errorf("load items query error: %w", err)
 	}
 	defer itemRows.Close()
 	for itemRows.Next() {
@@ -184,81 +289,16 @@ func (r *repo) WarmUpCache(ctx context.Context) error {
 			&it.Brand, &it.Status); err != nil {
 			return fmt.Errorf("scan item error: %w", err)
 		}
-		if o, ok := r.cache[oid]; ok {
-			o.Items = append(o.Items, it)
+		if v, ok := r.cache.Get(oid); ok {
+			v.Items = append(v.Items, it)
 		}
 	}
+	if err := itemRows.Err(); err != nil {
+		return fmt.Errorf("items rows error: %w", err)
+	}
 
-	log.Printf("WarmUpCache: loaded %d orders into cache", len(r.cache))
+	log.Printf("WarmUpCache: loaded %d orders into cache", len(orderIDs))
 	return nil
-}
-
-func (r *repo) GetByID(ctx context.Context, id string) (*models.Order, error) {
-
-	// сначала пытаемся достать из кэша
-	r.mu.RLock()
-	cached, ok := r.cache[id]
-	r.mu.RUnlock()
-
-	if ok {
-		fmt.Fprintf(os.Stdout, "%v data loaded from cache: %v\n", time.DateTime, id)
-		return cached, nil
-	}
-
-	// если нет в кэше → идём в БД
-	log.Printf("data loaded from database: %v", id)
-
-	var order models.Order
-
-	err := r.db.QueryRowContext(ctx, `SELECT order_uid, track_number, entry, locale, customer_id, delivery_service, shardkey, sm_id, date_created, oof_shard
-	                      FROM orders WHERE order_uid=$1`, id).
-		Scan(&order.OrderUID, &order.TrackNumber, &order.Entry, &order.Locale,
-			&order.CustomerID, &order.DeliveryService, &order.ShardKey, // <--- добавлено
-			&order.SmID, &order.DateCreated, &order.OofShard)
-	if err != nil {
-		return nil, fmt.Errorf("error getting order by id: %w", err)
-	}
-
-	err = r.db.QueryRowContext(ctx,
-		`SELECT name, phone, zip, city, address, region, email FROM deliveries WHERE order_uid=$1`, id).
-		Scan(&order.Delivery.Name, &order.Delivery.Phone, &order.Delivery.Zip,
-			&order.Delivery.City, &order.Delivery.Address, &order.Delivery.Region, &order.Delivery.Email)
-	if err != nil {
-		return nil, fmt.Errorf("error getting deliveries by id: %w", err)
-	}
-
-	err = r.db.QueryRowContext(ctx, `SELECT transaction, currency, provider, amount, payment_dt, bank, delivery_cost, goods_total, custom_fee
-	                   FROM payments WHERE order_uid=$1`, id).
-		Scan(&order.Payment.Transaction, &order.Payment.Currency, &order.Payment.Provider,
-			&order.Payment.Amount, &order.Payment.PaymentDT, &order.Payment.Bank,
-			&order.Payment.DeliveryCost, &order.Payment.GoodsTotal, &order.Payment.CustomFee)
-	if err != nil {
-		return nil, fmt.Errorf("error getting payments by id: %w", err)
-	}
-
-	rows, err := r.db.QueryContext(ctx, `SELECT chrt_id, track_number, price, rid, name, sale, size, total_price, nm_id, brand, status
-	                       FROM items WHERE order_uid=$1`, id)
-	if err != nil {
-		return nil, fmt.Errorf("error getting items by id: %w", err)
-	}
-	defer rows.Close()
-
-	for rows.Next() {
-		var it models.Item
-		err = rows.Scan(&it.ChrtID, &it.TrackNumber, &it.Price, &it.RID, &it.Name,
-			&it.Sale, &it.Size, &it.TotalPrice, &it.NmID, &it.Brand, &it.Status)
-		if err != nil {
-			log.Println(err)
-		}
-		order.Items = append(order.Items, it)
-
-	}
-
-	r.mu.Lock()
-	r.cache[id] = &order
-	r.mu.Unlock()
-
-	return &order, nil
 }
 
 func (r *repo) Close(ctx context.Context) error {

@@ -3,10 +3,11 @@ package controller
 import (
 	"database/sql"
 	"errors"
+	"net/http"
+
 	"github.com/Arkine2054/l0/internal/kafka"
 	"github.com/Arkine2054/l0/internal/logic"
 	"github.com/gin-gonic/gin"
-	"net/http"
 )
 
 type controller struct {
@@ -32,6 +33,10 @@ func (c *controller) Index(ctx *gin.Context) {
 
 func (c *controller) GetOrder(ctx *gin.Context) {
 	id := ctx.Param("id")
+	// Убираем ведущий слеш для wildcard параметра
+	if len(id) > 0 && id[0] == '/' {
+		id = id[1:]
+	}
 	if id == "" {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": "Введите ID заказа"})
 		return

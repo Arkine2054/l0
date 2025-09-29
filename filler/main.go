@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/Arkine2054/l0/internal/models"
+	"github.com/brianvoe/gofakeit/v7"
 	"github.com/confluentinc/confluent-kafka-go/kafka"
 )
 
@@ -15,9 +16,7 @@ func main() {
 	broker := os.Getenv("KAFKA_BROKERS")
 	topic := os.Getenv("KAFKA_TOPIC")
 
-	producer, err := kafka.NewProducer(&kafka.ConfigMap{
-		"bootstrap.servers": broker,
-	})
+	producer, err := kafka.NewProducer(&kafka.ConfigMap{"bootstrap.servers": broker})
 	if err != nil {
 		log.Fatal("cannot create producer:", err)
 	}
@@ -25,86 +24,63 @@ func main() {
 
 	for i := 1; i <= 5; i++ {
 		order := models.Order{
-			OrderUID:          fmt.Sprintf("test-%d", time.Now().UnixNano()),
-			TrackNumber:       fmt.Sprintf("track-%d", i),
-			Entry:             "web",
-			Locale:            "ru",
-			InternalSignature: "",
-			CustomerID:        fmt.Sprintf("customer-%d", i),
-			DeliveryService:   "DHL",
-			ShardKey:          "9",
-			SmID:              i,
-			DateCreated:       time.Now(),
-			OofShard:          "1",
+			OrderUID:        fmt.Sprintf("test-%d", time.Now().UnixNano()),
+			TrackNumber:     gofakeit.UUID(),
+			Entry:           "web",
+			Locale:          gofakeit.Language(),
+			CustomerID:      gofakeit.Username(),
+			DeliveryService: "DHL",
+			ShardKey:        fmt.Sprintf("%d", gofakeit.Number(1, 10)),
+			SmID:            i,
+			DateCreated:     time.Now(),
+			OofShard:        "1",
 			Delivery: models.Delivery{
-				Name:    "Иван Иванов",
-				Phone:   "+79998887766",
-				Zip:     "123456",
-				City:    "Москва",
-				Address: "ул. Пушкина, д. Колотушкина",
-				Region:  "Московская область",
-				Email:   "ivan@example.com",
+				Name:    gofakeit.Name(),
+				Phone:   gofakeit.Phone(),
+				Zip:     gofakeit.Zip(),
+				City:    gofakeit.City(),
+				Address: gofakeit.Street(),
+				Region:  gofakeit.State(),
+				Email:   gofakeit.Email(),
 			},
 			Payment: models.Payment{
-				Transaction:  fmt.Sprintf("tx-%d", i),
-				RequestID:    "",
+				Transaction:  gofakeit.UUID(),
 				Currency:     "RUB",
 				Provider:     "visa",
-				Amount:       1000 * i,
+				Amount:       int(gofakeit.Price(500, 5000)),
 				PaymentDT:    time.Now().Unix(),
-				Bank:         "Сбербанк",
+				Bank:         gofakeit.Company(),
 				DeliveryCost: 250,
-				GoodsTotal:   1000 * i,
+				GoodsTotal:   gofakeit.Number(1000, 5000),
 				CustomFee:    0,
 			},
 			Items: []models.Item{
 				{
-					ChrtID:      100 + i,
-					TrackNumber: fmt.Sprintf("track-%d", i),
-					Price:       500 * i,
-					RID:         "rid-1",
-					Name:        "Кроссовки",
-					Sale:        10,
-					Size:        "42",
-					TotalPrice:  450 * i,
-					NmID:        555,
-					Brand:       "Nike",
-					Status:      202,
-				},
-				{
-					ChrtID:      200 + i,
-					TrackNumber: fmt.Sprintf("track-%d", i),
-					Price:       700 * i,
-					RID:         "rid-2",
-					Name:        "Футболка",
-					Sale:        5,
-					Size:        "L",
-					TotalPrice:  665 * i,
-					NmID:        777,
-					Brand:       "Adidas",
+					ChrtID:      gofakeit.Number(100, 200),
+					TrackNumber: gofakeit.UUID(),
+					Price:       gofakeit.Number(100, 2000),
+					RID:         gofakeit.UUID(),
+					Name:        gofakeit.ProductName(),
+					Sale:        gofakeit.Number(0, 50),
+					Size:        gofakeit.RandomString([]string{"S", "M", "L", "XL"}),
+					TotalPrice:  gofakeit.Number(100, 2000),
+					NmID:        gofakeit.Number(1000, 2000),
+					Brand:       gofakeit.ProductName(),
 					Status:      202,
 				},
 			},
 		}
 
-		data, err := json.Marshal(order)
-		if err != nil {
-			log.Println("Error marshal test order:", err)
-			continue
-		}
-
-		err = producer.Produce(&kafka.Message{
+		data, _ := json.Marshal(order)
+		err := producer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
 			Value:          data,
 		}, nil)
-
 		if err != nil {
-			log.Println("produce error:", err)
-		} else {
-			log.Printf("Produced order %s\n", order.OrderUID)
+			return
 		}
 
-		time.Sleep(1 * time.Second)
+		log.Printf("Produced fake order %s\n", order.OrderUID)
 	}
 
 	producer.Flush(15 * 1000)

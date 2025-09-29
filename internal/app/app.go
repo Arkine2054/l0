@@ -4,6 +4,12 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"log"
+	"net/http"
+	"os"
+	"strconv"
+	"time"
+
 	"github.com/Arkine2054/l0/internal/controller"
 	"github.com/Arkine2054/l0/internal/kafka"
 	"github.com/Arkine2054/l0/internal/logic"
@@ -13,40 +19,56 @@ import (
 	"github.com/Arkine2054/l0/internal/util"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
-	"log"
-	"net/http"
-	"os"
-	"time"
 )
 
-func Run() error {
-	dbHost := os.Getenv("DB_HOST")
-	dbPort := os.Getenv("DB_PORT")
-	dbUser := os.Getenv("DB_USER")
-	dbPassword := os.Getenv("DB_PASSWORD")
-	dbName := os.Getenv("DB_NAME")
-	kafkaBrokers := os.Getenv("KAFKA_BROKERS")
-	kafkaTopic := os.Getenv("KAFKA_TOPIC")
-	group := "l0-consumer-group"
-
-	if kafkaBrokers == "" || kafkaTopic == "" {
-		return fmt.Errorf("KAFKA_BROKERS и KAFKA_TOPIC обязательны")
+func getEnv(key string, required bool, def string) string {
+	val := os.Getenv(key)
+	if val == "" {
+		if required {
+			log.Fatalf("missing required environment variable: %s", key)
+		}
+		return def
 	}
+	return val
+}
+
+func Run() error {
+	dbHost := getEnv("DB_HOST", true, "")
+	dbPort := getEnv("DB_PORT", true, "")
+	dbUser := getEnv("DB_USER", true, "")
+	dbPassword := getEnv("DB_PASSWORD", true, "")
+	dbName := getEnv("DB_NAME", true, "")
+	dbSSL := getEnv("DB_SSLMODE", false, "disable")
+
+	kafkaBrokers := getEnv("KAFKA_BROKERS", true, "")
+	kafkaTopic := getEnv("KAFKA_TOPIC", true, "")
+	kafkaGroup := getEnv("KAFKA_GROUP", false, "l0-consumer-group")
+	dlqTopic := getEnv("KAFKA_DLQ_TOPIC", false, "orders_dlq")
+
+	httpPort := getEnv("HTTP_PORT", false, "8080")
 
 	if err := util.TestConnection(kafkaBrokers); err != nil {
 		return err
 	}
 
 	connStr := fmt.Sprintf(
-		"host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-		dbHost, dbPort, dbUser, dbPassword, dbName,
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		dbHost, dbPort, dbUser, dbPassword, dbName, dbSSL,
 	)
 	db, err := sql.Open("postgres", connStr)
 	if err != nil {
 		return fmt.Errorf("DB connect error: %w", err)
 	}
 
-	repository := repo.NewRepo(db)
+	cacheSizeStr := os.Getenv("CACHE_SIZE")
+	cacheSize := 1000
+	if cacheSizeStr != "" {
+		if v, err := strconv.Atoi(cacheSizeStr); err == nil && v > 0 {
+			cacheSize = v
+		}
+	}
+
+	repository := repo.NewRepo(db, cacheSize)
 
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	if err := repository.WarmUpCache(ctx); err != nil {
@@ -57,12 +79,12 @@ func Run() error {
 
 	l := logic.NewLogic(repository)
 
-	dlqProducer, err := kafka.NewProducer(kafkaBrokers, "orders_dlq")
+	dlqProducer, err := kafka.NewProducer(kafkaBrokers, dlqTopic)
 	if err != nil {
 		log.Fatalf("DLQ producer error: %v", err)
 	}
 
-	consumer, err := kafka.NewConsumer(kafkaBrokers, kafkaTopic, group, dlqProducer)
+	consumer, err := kafka.NewConsumer(kafkaBrokers, kafkaTopic, kafkaGroup, dlqProducer)
 	if err != nil {
 		log.Fatalf("consumer error: %v", err)
 	}
@@ -87,7 +109,7 @@ func Run() error {
 	router.GET("/order/:id", c.GetOrder)
 
 	srv := &http.Server{
-		Addr:    ":8080",
+		Addr:    ":" + httpPort,
 		Handler: router,
 	}
 
@@ -102,7 +124,7 @@ func Run() error {
 		},
 	)
 
-	log.Println("HTTP сервер запущен на :8080")
+	log.Printf("HTTP сервер запущен на :%s", httpPort)
 
 	if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 		return fmt.Errorf("server error: %w", err)

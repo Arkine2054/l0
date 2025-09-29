@@ -18,5 +18,6 @@ COPY --from=builder /app/service .
 COPY --from=migrate-builder /go/bin/migrate /usr/local/bin/migrate
 COPY migrations ./migrations
 COPY templates ./templates
+COPY .env ./.env
 
 CMD migrate -path ./migrations -database "postgres://$DB_USER:$DB_PASSWORD@$DB_HOST:$DB_PORT/$DB_NAME?sslmode=disable" up && ./service
