@@ -52,7 +52,6 @@ func NewRepo(db *sql.DB, cacheSize int) Repo {
 	}
 }
 
-// NewRepoWithCache allows injecting a custom cache implementation (useful for tests).
 func NewRepoWithCache(db *sql.DB, cache Cache) Repo {
 	return &repo{db: db, cache: cache}
 }
