@@ -21,30 +21,28 @@ type Consumer struct {
 
 var validate = validator.New()
 
-// ConsumerIF is the narrow interface used by the app to start/stop consumption.
 type ConsumerIF interface {
 	Listen(ctx context.Context, handler func(order *models.Order) error) error
 	Close(ctx context.Context) error
 }
 
-// ConsumerClient abstracts the low-level confluent consumer.
 type ConsumerClient interface {
 	SubscribeTopics(topics []string) error
 	Poll(timeoutMs int) interface{}
-	CommitMessage(msg *ckafka.Message) (*ckafka.TopicPartition, error)
+	CommitMessage(msg *ckafka.Message) ([]ckafka.TopicPartition, error)
 	Close() error
 }
 
-// confluentConsumerClient adapts confluent-kafka-go Consumer to ConsumerClient.
 type confluentConsumerClient struct{ c *ckafka.Consumer }
 
 func (a *confluentConsumerClient) SubscribeTopics(topics []string) error {
 	return a.c.SubscribeTopics(topics, nil)
 }
 func (a *confluentConsumerClient) Poll(timeoutMs int) interface{} { return a.c.Poll(timeoutMs) }
-func (a *confluentConsumerClient) CommitMessage(msg *ckafka.Message) (*ckafka.TopicPartition, error) {
+func (a *confluentConsumerClient) CommitMessage(msg *ckafka.Message) ([]ckafka.TopicPartition, error) {
 	return a.c.CommitMessage(msg)
 }
+
 func (a *confluentConsumerClient) Close() error { return a.c.Close() }
 
 func NewConsumer(brokers, topic, group string, dlqProducer *Producer) (*Consumer, error) {
@@ -106,7 +104,6 @@ func (c *Consumer) Listen(ctx context.Context, handler func(order *models.Order)
 					continue
 				}
 
-				// ✅ Валидация данных
 				if err := validate.Struct(order); err != nil {
 					log.Printf("[WARN] Ошибка валидации заказа: %v. Отправляем в DLQ...", err)
 					c.sendToDLQ(e.Value)
@@ -116,7 +113,6 @@ func (c *Consumer) Listen(ctx context.Context, handler func(order *models.Order)
 
 				if err := handler(order); err != nil {
 					log.Printf("[ERROR] Ошибка обработки заказа %s: %v", order.OrderUID, err)
-					// опционально: тоже в DLQ
 					c.sendToDLQ(e.Value)
 					continue
 				}

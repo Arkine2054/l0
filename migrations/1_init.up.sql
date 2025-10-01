@@ -22,7 +22,7 @@ CREATE TABLE deliveries (
     address   TEXT NOT NULL,
     region    TEXT NOT NULL,
     email     TEXT NOT NULL,
-CONSTRAINT deliveries_order_uid_unique UNIQUE (order_uid) -- уникальная доставка для заказа
+CONSTRAINT deliveries_order_uid_unique UNIQUE (order_uid)
     );
 
 CREATE TABLE payments (
@@ -38,7 +38,7 @@ CREATE TABLE payments (
     delivery_cost INT NOT NULL,
     goods_total   INT NOT NULL,
     custom_fee    INT NOT NULL,
-CONSTRAINT payments_order_uid_unique UNIQUE (order_uid) -- уникальный платёж для заказа
+CONSTRAINT payments_order_uid_unique UNIQUE (order_uid)
     );
 
 CREATE TABLE items (

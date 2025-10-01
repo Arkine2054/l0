@@ -13,18 +13,15 @@ type Producer struct {
 	topic  string
 }
 
-// ProducerIF is a minimal interface used by other components (e.g., DLQ sender).
 type ProducerIF interface {
 	Send(key, value []byte) error
 }
 
-// ProducerClient abstracts the low-level Kafka producer we use.
 type ProducerClient interface {
 	Produce(msg *ckafka.Message) error
 	Flush(timeoutMs int)
 }
 
-// confluentProducerClient adapts confluent-kafka-go Producer to ProducerClient.
 type confluentProducerClient struct {
 	p *ckafka.Producer
 }

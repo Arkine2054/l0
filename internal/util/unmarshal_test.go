@@ -157,7 +157,6 @@ func TestUnmarshalOrder(t *testing.T) {
 				assert.NoError(t, err)
 				assert.NotNil(t, got)
 
-				// Для теста с валидным заказом проверяем основные поля
 				if tt.name == "valid order" {
 					assert.Equal(t, tt.want.OrderUID, got.OrderUID)
 					assert.Equal(t, tt.want.TrackNumber, got.TrackNumber)
@@ -169,7 +168,6 @@ func TestUnmarshalOrder(t *testing.T) {
 					assert.Equal(t, tt.want.SmID, got.SmID)
 					assert.Equal(t, tt.want.OofShard, got.OofShard)
 
-					// Проверяем Delivery
 					assert.Equal(t, tt.want.Delivery.Name, got.Delivery.Name)
 					assert.Equal(t, tt.want.Delivery.Phone, got.Delivery.Phone)
 					assert.Equal(t, tt.want.Delivery.Zip, got.Delivery.Zip)
@@ -178,7 +176,6 @@ func TestUnmarshalOrder(t *testing.T) {
 					assert.Equal(t, tt.want.Delivery.Region, got.Delivery.Region)
 					assert.Equal(t, tt.want.Delivery.Email, got.Delivery.Email)
 
-					// Проверяем Payment
 					assert.Equal(t, tt.want.Payment.Transaction, got.Payment.Transaction)
 					assert.Equal(t, tt.want.Payment.Currency, got.Payment.Currency)
 					assert.Equal(t, tt.want.Payment.Provider, got.Payment.Provider)
@@ -189,7 +186,6 @@ func TestUnmarshalOrder(t *testing.T) {
 					assert.Equal(t, tt.want.Payment.GoodsTotal, got.Payment.GoodsTotal)
 					assert.Equal(t, tt.want.Payment.CustomFee, got.Payment.CustomFee)
 
-					// Проверяем Items
 					assert.Len(t, got.Items, len(tt.want.Items))
 					for i, item := range tt.want.Items {
 						assert.Equal(t, item.ChrtID, got.Items[i].ChrtID)
@@ -205,7 +201,6 @@ func TestUnmarshalOrder(t *testing.T) {
 						assert.Equal(t, item.Status, got.Items[i].Status)
 					}
 				} else {
-					// Для других тестов просто проверяем, что структура создана
 					assert.NotNil(t, got)
 				}
 			}

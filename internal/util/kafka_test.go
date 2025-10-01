@@ -42,8 +42,6 @@ func TestTestConnection(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 			} else {
-				// В реальном тесте без Kafka это может упасть
-				// В production лучше использовать testcontainers
 				if err != nil {
 					t.Skip("Skipping test - Kafka not available")
 					return

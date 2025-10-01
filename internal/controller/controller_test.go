@@ -23,14 +23,12 @@ func TestController_Index(t *testing.T) {
 	defer ctrl.Finish()
 
 	mockLogic := NewMockLogic(ctrl)
-	producer := &kafka.Producer{} // В реальном тесте можно замокать и это
+	producer := &kafka.Producer{}
 
-	// Приводим MockLogic к интерфейсу logic.Logic
 	var logicInterface logic.Logic = mockLogic
 	controller := NewController(logicInterface, producer)
 
 	router := gin.New()
-	// Загружаем HTML шаблоны для теста
 	router.LoadHTMLGlob("../../templates/*")
 	router.GET("/", controller.Index)
 
@@ -112,7 +110,6 @@ func TestController_GetOrder(t *testing.T) {
 			name:    "empty order id",
 			orderID: "",
 			mockSetup: func(m *MockLogic) {
-				// Не должно быть вызовов к логике
 			},
 			expectedStatus: http.StatusBadRequest,
 		},
@@ -147,7 +144,6 @@ func TestController_GetOrder(t *testing.T) {
 			tt.mockSetup(mockLogic)
 
 			producer := &kafka.Producer{}
-			// Приводим MockLogic к интерфейсу logic.Logic
 			var logicInterface logic.Logic = mockLogic
 			controller := NewController(logicInterface, producer)
 

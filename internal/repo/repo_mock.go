@@ -11,30 +11,25 @@ import (
 	reflect "reflect"
 )
 
-// MockRepo is a mock of Repo interface.
 type MockRepo struct {
 	ctrl     *gomock.Controller
 	recorder *MockRepoMockRecorder
 }
 
-// MockRepoMockRecorder is the mock recorder for MockRepo.
 type MockRepoMockRecorder struct {
 	mock *MockRepo
 }
 
-// NewMockRepo creates a new mock instance.
 func NewMockRepo(ctrl *gomock.Controller) *MockRepo {
 	mock := &MockRepo{ctrl: ctrl}
 	mock.recorder = &MockRepoMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockRepo) EXPECT() *MockRepoMockRecorder {
 	return m.recorder
 }
 
-// Close mocks base method.
 func (m *MockRepo) Close(ctx context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Close", ctx)
@@ -42,13 +37,11 @@ func (m *MockRepo) Close(ctx context.Context) error {
 	return ret0
 }
 
-// Close indicates an expected call of Close.
 func (mr *MockRepoMockRecorder) Close(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Close", reflect.TypeOf((*MockRepo)(nil).Close), ctx)
 }
 
-// CreateOrder mocks base method.
 func (m *MockRepo) CreateOrder(ctx context.Context, order *models.Order) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateOrder", ctx, order)
@@ -56,13 +49,11 @@ func (m *MockRepo) CreateOrder(ctx context.Context, order *models.Order) error {
 	return ret0
 }
 
-// CreateOrder indicates an expected call of CreateOrder.
 func (mr *MockRepoMockRecorder) CreateOrder(ctx, order interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrder", reflect.TypeOf((*MockRepo)(nil).CreateOrder), ctx, order)
 }
 
-// GetByID mocks base method.
 func (m *MockRepo) GetByID(ctx context.Context, id string) (*models.Order, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetByID", ctx, id)
@@ -71,13 +62,11 @@ func (m *MockRepo) GetByID(ctx context.Context, id string) (*models.Order, error
 	return ret0, ret1
 }
 
-// GetByID indicates an expected call of GetByID.
 func (mr *MockRepoMockRecorder) GetByID(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetByID", reflect.TypeOf((*MockRepo)(nil).GetByID), ctx, id)
 }
 
-// WarmUpCache mocks base method.
 func (m *MockRepo) WarmUpCache(ctx context.Context) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "WarmUpCache", ctx)
@@ -85,46 +74,38 @@ func (m *MockRepo) WarmUpCache(ctx context.Context) error {
 	return ret0
 }
 
-// WarmUpCache indicates an expected call of WarmUpCache.
 func (mr *MockRepoMockRecorder) WarmUpCache(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "WarmUpCache", reflect.TypeOf((*MockRepo)(nil).WarmUpCache), ctx)
 }
 
-// MockCache is a mock of Cache interface.
 type MockCache struct {
 	ctrl     *gomock.Controller
 	recorder *MockCacheMockRecorder
 }
 
-// MockCacheMockRecorder is the mock recorder for MockCache.
 type MockCacheMockRecorder struct {
 	mock *MockCache
 }
 
-// NewMockCache creates a new mock instance.
 func NewMockCache(ctrl *gomock.Controller) *MockCache {
 	mock := &MockCache{ctrl: ctrl}
 	mock.recorder = &MockCacheMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockCache) EXPECT() *MockCacheMockRecorder { return m.recorder }
 
-// Add mocks base method.
 func (m *MockCache) Add(key string, value *models.Order) {
 	m.ctrl.T.Helper()
 	m.ctrl.Call(m, "Add", key, value)
 }
 
-// Add indicates an expected call of Add.
 func (mr *MockCacheMockRecorder) Add(key, value interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Add", reflect.TypeOf((*MockCache)(nil).Add), key, value)
 }
 
-// Get mocks base method.
 func (m *MockCache) Get(key string) (*models.Order, bool) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "Get", key)
@@ -133,7 +114,6 @@ func (m *MockCache) Get(key string) (*models.Order, bool) {
 	return ret0, ret1
 }
 
-// Get indicates an expected call of Get.
 func (mr *MockCacheMockRecorder) Get(key interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Get", reflect.TypeOf((*MockCache)(nil).Get), key)

@@ -17,31 +17,26 @@ import (
 	gomock "go.uber.org/mock/gomock"
 )
 
-// MockLogic is a mock of Logic interface.
 type MockLogic struct {
 	ctrl     *gomock.Controller
 	recorder *MockLogicMockRecorder
 	isgomock struct{}
 }
 
-// MockLogicMockRecorder is the mock recorder for MockLogic.
 type MockLogicMockRecorder struct {
 	mock *MockLogic
 }
 
-// NewMockLogic creates a new mock instance.
 func NewMockLogic(ctrl *gomock.Controller) *MockLogic {
 	mock := &MockLogic{ctrl: ctrl}
 	mock.recorder = &MockLogicMockRecorder{mock}
 	return mock
 }
 
-// EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockLogic) EXPECT() *MockLogicMockRecorder {
 	return m.recorder
 }
 
-// CreateOrder mocks base method.
 func (m *MockLogic) CreateOrder(ctx context.Context, order *models.Order) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateOrder", ctx, order)
@@ -49,13 +44,11 @@ func (m *MockLogic) CreateOrder(ctx context.Context, order *models.Order) error 
 	return ret0
 }
 
-// CreateOrder indicates an expected call of CreateOrder.
 func (mr *MockLogicMockRecorder) CreateOrder(ctx, order any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateOrder", reflect.TypeOf((*MockLogic)(nil).CreateOrder), ctx, order)
 }
 
-// GetOrder mocks base method.
 func (m *MockLogic) GetOrder(ctx context.Context, id string) (*models.Order, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOrder", ctx, id)
@@ -64,7 +57,6 @@ func (m *MockLogic) GetOrder(ctx context.Context, id string) (*models.Order, err
 	return ret0, ret1
 }
 
-// GetOrder indicates an expected call of GetOrder.
 func (mr *MockLogicMockRecorder) GetOrder(ctx, id any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOrder", reflect.TypeOf((*MockLogic)(nil).GetOrder), ctx, id)

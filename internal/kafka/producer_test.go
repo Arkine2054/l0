@@ -27,13 +27,13 @@ func TestNewProducer(t *testing.T) {
 			name:    "empty brokers",
 			brokers: "",
 			topic:   "test-topic",
-			wantErr: false, // Kafka позволяет создать producer с пустыми brokers
+			wantErr: false,
 		},
 		{
 			name:    "empty topic",
 			brokers: "localhost:9092",
 			topic:   "",
-			wantErr: false, // Producer создается, но topic может быть пустым
+			wantErr: false,
 		},
 	}
 
@@ -45,8 +45,6 @@ func TestNewProducer(t *testing.T) {
 				assert.Error(t, err)
 				assert.Nil(t, producer)
 			} else {
-				// В реальном тесте без Kafka это может упасть
-				// В production лучше использовать testcontainers
 				if err != nil {
 					t.Skip("Skipping test - Kafka not available")
 					return
@@ -60,8 +58,6 @@ func TestNewProducer(t *testing.T) {
 }
 
 func TestProducer_SendOrder(t *testing.T) {
-	// Этот тест требует реального Kafka
-	// В production лучше использовать testcontainers
 	t.Skip("Skipping integration test - requires Kafka")
 
 	producer, err := NewProducer("localhost:9092", "test-topic")
@@ -121,7 +117,6 @@ func TestProducer_SendOrder(t *testing.T) {
 }
 
 func TestProducer_Close(t *testing.T) {
-	// Этот тест требует реального Kafka
 	t.Skip("Skipping integration test - requires Kafka")
 
 	producer, err := NewProducer("localhost:9092", "test-topic")
@@ -133,8 +128,6 @@ func TestProducer_Close(t *testing.T) {
 	err = producer.Close(ctx)
 	assert.NoError(t, err)
 }
-
-// --- Unit tests with mocked client ---
 
 type mockProducerClient struct {
 	produceErr error

@@ -10,7 +10,7 @@ RUN go build -o service main.go
 FROM golang:1.24.1 AS migrate-builder
 RUN go install -tags 'postgres' github.com/golang-migrate/migrate/v4/cmd/migrate@latest
 
-# final image (bookworm чтобы не было проблем с glibc)
+# final image
 FROM debian:bookworm-slim
 WORKDIR /app
 

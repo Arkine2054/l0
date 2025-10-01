@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"fmt"
 	"log"
-	"os"
 	"sync"
 
 	"github.com/Arkine2054/l0/internal/models"
@@ -15,14 +14,11 @@ import (
 	"github.com/lib/pq"
 )
 
-// Cache abstracts a simple key-value cache for orders.
-// It allows the repository to be tested without binding to a specific cache implementation.
 type Cache interface {
 	Get(key string) (*models.Order, bool)
 	Add(key string, value *models.Order)
 }
 
-// lruCacheAdapter adapts hashicorp/golang-lru Cache to the local Cache interface.
 type lruCacheAdapter struct {
 	c *lru.Cache[string, *models.Order]
 }

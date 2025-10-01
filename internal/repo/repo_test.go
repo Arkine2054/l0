@@ -11,30 +11,21 @@ import (
 )
 
 func TestRepo_CreateOrder(t *testing.T) {
-	// Этот тест требует реальной базы данных
-	// В реальном проекте лучше использовать testcontainers или in-memory SQLite
 	t.Skip("Skipping integration test - requires database")
 }
 
 func TestRepo_GetByID(t *testing.T) {
-	// Этот тест требует реальной базы данных
-	// В реальном проекте лучше использовать testcontainers или in-memory SQLite
 	t.Skip("Skipping integration test - requires database")
 }
 
 func TestRepo_WarmUpCache(t *testing.T) {
-	// Этот тест требует реальной базы данных
-	// В реальном проекте лучше использовать testcontainers или in-memory SQLite
 	t.Skip("Skipping integration test - requires database")
 }
 
 func TestRepo_Close(t *testing.T) {
-	// Этот тест требует реальной базы данных
-	// В реальном проекте лучше использовать testcontainers или in-memory SQLite
 	t.Skip("Skipping integration test - requires database")
 }
 
-// Вспомогательные функции для создания тестовых данных
 func createTestOrder() *models.Order {
 	return &models.Order{
 		OrderUID:        "test-order-123",
@@ -85,7 +76,6 @@ func createTestOrder() *models.Order {
 	}
 }
 
-// Unit test: cache hit path should return from cache without touching DB
 func TestRepo_GetByID_CacheHit(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
@@ -100,7 +90,6 @@ func TestRepo_GetByID_CacheHit(t *testing.T) {
 	assert.Equal(t, want, got)
 }
 
-// Тесты для создания репозитория
 func TestNewRepo(t *testing.T) {
 	tests := []struct {
 		name      string

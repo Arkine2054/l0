@@ -33,7 +33,6 @@ func (c *controller) Index(ctx *gin.Context) {
 
 func (c *controller) GetOrder(ctx *gin.Context) {
 	id := ctx.Param("id")
-	// Убираем ведущий слеш для wildcard параметра
 	if len(id) > 0 && id[0] == '/' {
 		id = id[1:]
 	}
