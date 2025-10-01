@@ -97,6 +97,7 @@ func (c *Consumer) Listen(ctx context.Context, handler func(order *models.Order)
 			switch e := ev.(type) {
 			case *ckafka.Message:
 				order, err := util.UnmarshalOrder(e.Value)
+
 				if err != nil {
 					log.Printf("[WARN] Ошибка парсинга JSON: %v. Отправляем в DLQ...", err)
 					c.sendToDLQ(e.Value)

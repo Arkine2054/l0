@@ -71,18 +71,23 @@ func main() {
 			},
 		}
 
-		data, _ := json.Marshal(order)
-		err := producer.Produce(&kafka.Message{
+		data, err := json.Marshal(order)
+		if err != nil {
+			log.Println("Error marshal test order:", err)
+			continue
+		}
+
+		err = producer.Produce(&kafka.Message{
 			TopicPartition: kafka.TopicPartition{Topic: &topic, Partition: kafka.PartitionAny},
 			Value:          data,
 		}, nil)
-		if err != nil {
-			return
-		}
 
+		if err != nil {
+			log.Println("Produce error:", err)
+		}
 		log.Printf("Produced fake order %s\n", order.OrderUID)
 	}
 
-	producer.Flush(15 * 1000)
+	producer.Flush(15 * 10)
 	fmt.Println("Filler finished.")
 }
