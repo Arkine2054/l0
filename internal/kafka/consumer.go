@@ -101,14 +101,20 @@ func (c *Consumer) Listen(ctx context.Context, handler func(order *models.Order)
 				if err != nil {
 					log.Printf("[WARN] Ошибка парсинга JSON: %v. Отправляем в DLQ...", err)
 					c.sendToDLQ(e.Value)
-					_, _ = c.client.CommitMessage(e)
+					_, err = c.client.CommitMessage(e)
+					if err != nil {
+						log.Printf("[ERROR] Commit offset error: %v", err)
+					}
 					continue
 				}
 
 				if err := validate.Struct(order); err != nil {
 					log.Printf("[WARN] Ошибка валидации заказа: %v. Отправляем в DLQ...", err)
 					c.sendToDLQ(e.Value)
-					_, _ = c.client.CommitMessage(e)
+					_, err = c.client.CommitMessage(e)
+					if err != nil {
+						log.Printf("[ERROR] Commit offset error: %v", err)
+					}
 					continue
 				}
 
