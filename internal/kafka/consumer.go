@@ -103,7 +103,7 @@ func (c *Consumer) Listen(ctx context.Context, handler func(order *models.Order)
 					c.sendToDLQ(e.Value)
 					_, err = c.client.CommitMessage(e)
 					if err != nil {
-						log.Printf("[ERROR] Commit offset error: %v", err)
+						log.Printf("[ERROR] Parsing commit offset error: %v", err)
 					}
 					continue
 				}
@@ -113,7 +113,7 @@ func (c *Consumer) Listen(ctx context.Context, handler func(order *models.Order)
 					c.sendToDLQ(e.Value)
 					_, err = c.client.CommitMessage(e)
 					if err != nil {
-						log.Printf("[ERROR] Commit offset error: %v", err)
+						log.Printf("[ERROR] Validation commit offset error: %v", err)
 					}
 					continue
 				}
